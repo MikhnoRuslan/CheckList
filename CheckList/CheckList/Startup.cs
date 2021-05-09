@@ -1,13 +1,14 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using CheckList.DAL;
+using Microsoft.AspNetCore.Identity;
+using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Mvc.Razor;
 
 namespace CheckList
 {
@@ -23,7 +24,35 @@ namespace CheckList
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddControllersWithViews();
+            services.AddMvc().AddJsonOptions(opts =>
+                opts.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
+                .AddRazorRuntimeCompilation();
+
+            services.AddControllersWithViews()
+                .AddViewLocalization(LanguageViewLocationExpanderFormat.Suffix)
+                .AddDataAnnotationsLocalization();
+
+            services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+            .AddCookie(opts =>
+            {
+                opts.LoginPath = "/User/Login";
+                opts.AccessDeniedPath = "/User/Login";
+                opts.Cookie.Name = "AuthDemo";
+            });
+
+            services.AddDbContext<CheckListContext>(opts =>
+                opts.UseSqlServer(Configuration.GetConnectionString("CheckListConnection")));
+
+            services.AddDefaultIdentity<User>()
+                .AddRoles<IdentityRole>()
+                .AddEntityFrameworkStores<CheckListContext>();
+
+            services.Configure<IdentityOptions>(opts =>
+            {
+                opts.User.RequireUniqueEmail = true;
+            });
+
+            services.AddScoped<IdentityRole>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -44,6 +73,7 @@ namespace CheckList
 
             app.UseRouting();
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.UseEndpoints(endpoints =>
@@ -51,6 +81,8 @@ namespace CheckList
                 endpoints.MapControllerRoute(
                     name: "default",
                     pattern: "{controller=Home}/{action=Index}/{id?}");
+
+                endpoints.MapControllers();
             });
         }
     }
